@@ -1,0 +1,102 @@
+// What is the average trip cost of holidays? How does it compare to non-holidays?
+SELECT
+case 
+	when c.holiday=1 then 'Holidays'
+	else 'Non Holidays'
+end Holidays,
+cast(avg(trip_fare) as numeric(10,2))
+FROM TRIP t
+	JOIN CALENDAR c
+	ON t.call_time::date  =  c.calendar_date
+GROUP BY
+Holidays
+
+// Find the average call time (the time in which a trip was requested) of the first time passengers make a trip.
+
+SELECT 
+
+avg(dv.new_time) as average_call_time, // Calculate the average call time
+avg(dv.finish_call_time) as average_time_between_finish_call // Calculate the average between finish_time - call_time
+
+FROM(SELECT
+	cast(t.call_time as time) as new_time,
+	(t.finish_time - t.call_time) as finish_call_time 
+		FROM trip t
+			JOIN passenger p
+			ON t.passenger_id = p.id
+	 )dv
+
+// Find the average number of trips per driver for every week day.
+SELECT 
+dv.driver_id,
+dv.week_day,
+cast(sum(dv.prueba)/count(dv.week_day) as numeric (10,2))
+FROM (
+	SELECT
+	t.driver_id,
+	c.week_day,
+	t.call_time::date,
+	count(t.call_time::date) prueba
+	FROM trip t
+		JOIN calendar c
+			ON t.call_time::date  =  c.calendar_date 	
+	GROUP BY
+		t.driver_id,
+		c.week_day,
+		t.call_time::date
+	)dv	
+GROUP BY
+dv.driver_id,
+dv.week_day
+
+// Which day of the week drivers usually drive the most distance on average?
+
+SELECT 
+dv.week_day,
+cast(avg(dv.trip_distance) as numeric(10,2))
+FROM (
+	SELECT
+	c.week_day,
+	t.trip_distance
+	FROM trip t
+		JOIN calendar c
+			ON t.call_time::date  =  c.calendar_date 	
+	GROUP BY
+		c.week_day,
+		t.trip_distance
+	)dv	
+GROUP BY
+dv.week_day
+ORDER BY
+avg DESC
+
+//What was the growth percentage of rides month over month?
+SELECT
+EXTRACT(Year FROM call_time) as year_number,
+EXTRACT(MONTH FROM call_time) as month_number,
+count(call_time) as number_rides,
+lag(count(call_time),1) over (order by EXTRACT(MONTH FROM call_time)) as previous_month,
+(100 * (count(call_time) - lag(count(call_time),1) over (order by EXTRACT(MONTH FROM call_time))) / lag(count(call_time),1) over (order by EXTRACT(MONTH FROM call_time))) || '%' as growth
+FROM trip
+GROUP BY
+year_number,
+month_number
+ORDER BY
+month_number ASC
+
+
+//List the top 5 drivers per number of trips in the top 5 largest cities.
+
+SELECT 
+t.driver_id,
+c.name,
+count(t.call_time) as number_trips
+FROM trip t
+	JOIN city c
+	ON cast(t.city_id as INTEGER) = c.id
+GROUP BY 
+t.driver_id,
+c.name
+ORDER BY
+number_trips DESC
+LIMIT 5
